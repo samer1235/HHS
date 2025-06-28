@@ -1,15 +1,33 @@
 {
-  "name": "store-project",
+  "name": "iphone-orders",
   "version": "1.0.0",
-  "description": "متجر إلكتروني بسيط مع تسجيل دخول وحسابات بدون PHP",
+  "description": "Backend for 4 STORE iPhone Orders using Express and PostgreSQL",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "bcrypt": "^5.1.0",
+    "axios": "^1.4.0",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
     "express": "^4.18.2",
+    "express-basic-auth": "^1.2.0",
     "express-session": "^1.17.3",
-    "pg": "^8.11.0"
-  }
+    "pg": "^8.11.1",
+    "node-fetch": "^2.6.7",
+    "socket.io": "^4.7.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "express",
+    "postgresql",
+    "4store",
+    "iphone-orders",
+    "railway"
+  ],
+  "author": "4 STORE",
+  "license": "MIT"
 }
