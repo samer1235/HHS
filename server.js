@@ -27,10 +27,9 @@ async function sendDiscordLog(message) {
 
 // إعداد اتصال قاعدة البيانات
 const pool = new Pool({
-  connectionString: 'postgresql://postgres:ZhuZBHzJYgVhabsZuiMtColWRqCoiybU@turntable.proxy.rlwy.net:27311/railway',
+  connectionString: 'postgresql://postgres:mXAiWasoFVFCFMoxciHDHRZnbyRMtMRU@metro.proxy.rlwy.net:55602/railway',
   ssl: { rejectUnauthorized: false }
 });
-
 // إنشاء جدول الطلبات إذا لم يكن موجود
 pool.query(`
   CREATE TABLE IF NOT EXISTS orders (
