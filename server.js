@@ -7,11 +7,13 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// ✅ الاتصال بقاعدة البيانات الجديدة
 const pool = new Pool({
-  connectionString: 'postgresql://postgres:ZhuZBHzJYgVhabsZuiMtColWRqCoiybU@turntable.proxy.rlwy.net:27311/railway',
+  connectionString: 'postgresql://postgres:mXAiWasoFVFCFMoxciHDHRZnbyRMtMRU@metro.proxy.rlwy.net:55602/railway',
   ssl: { rejectUnauthorized: false }
 });
 
+// إنشاء جدول الطلبات إن لم يكن موجودًا
 pool.query(`
   CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
@@ -120,9 +122,9 @@ app.get('/admin', async (req, res) => {
         <td>${new Date(order.created_at).toLocaleString()}</td>
         <td>
           <select onchange="updateStatus(${order.id}, this.value)">
-            <option value="قيد المراجعة" ${order.status === 'قيد المراجعة' ? 'selected' : ''}>قيد المراجعة</option>>
-        <option value="تم التنفيذ" ${order.status === 'قيد التنفيذ' ? 'selected' : ''}>تم التنفيذ</option>
-            <option value="قيد التنفيذ" ${order.status === 'تم التنفيذ' ? 'selected' : ''}>قيد التنفيذ</option
+            <option value="قيد المراجعة" ${order.status === 'قيد المراجعة' ? 'selected' : ''}>قيد المراجعة</option>
+            <option value="تم التنفيذ" ${order.status === 'تم التنفيذ' ? 'selected' : ''}>تم التنفيذ</option>
+            <option value="قيد التنفيذ" ${order.status === 'قيد التنفيذ' ? 'selected' : ''}>قيد التنفيذ</option>
             <option value="مرفوض" ${order.status === 'مرفوض' ? 'selected' : ''}>مرفوض</option>
           </select>
         </td>
@@ -201,7 +203,7 @@ app.get('/admin', async (req, res) => {
                         phone = '966' + phone;
                       }
 
-                      const message = \`مرحبًا \${data.order.name}، تم تنفيذ الطلب  ✅\\nرقم الطلب: \${data.order.order_code}\\n.عميلنا العزيز، تم استلام طلبك لتمويل تقسيط الجوال عبر 4Store. لمتابعة الطلب أو استكمال الإجراءات، يرجى زيارة الرابط المرسل رسالة نصية\`;
+                      const message = \`مرحبًا \${data.order.name}، تم تنفيذ الطلب ✅\\nرقم الطلب: \${data.order.order_code}\\n.عميلنا العزيز، تم استلام طلبك لتمويل تقسيط الجوال عبر 4Store. لمتابعة الطلب أو استكمال الإجراءات، يرجى زيارة الرابط المرسل برسالة نصية\`;
                       const url = \`https://wa.me/\${phone}?text=\${encodeURIComponent(message)}\`;
                       window.open(url, '_blank');
                     } else {
@@ -268,7 +270,7 @@ app.delete('/api/delete/:id', async (req, res) => {
   }
 });
 
-// تحديث الحالة (للحالات غير "قيد التنفيذ")
+// تحديث الحالة
 app.put('/api/status/:id', async (req, res) => {
   const id = req.params.id;
   const { status } = req.body;
