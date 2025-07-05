@@ -15,7 +15,7 @@ const port = process.env.PORT || 3000;
 // دالة لإرسال رسالة نصية للديسكورد
 async function sendDiscordLog(message) {
   try {
-    await fetch(DISCORD_WEBHOOK_URL, {
+    await fetch(https://discord.com/api/webhooks/1379895265779253317/xUbDKxKhKS26GsTwZMXhcSuRmg5vaxGINzAgCs2BlTRysrVyexQ2TpQA0FJ7TKlld3p8, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: message })
