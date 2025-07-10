@@ -7,7 +7,7 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ✅ الاتصال بقاعدة البيانات الجديدة
+// اتصال قاعدة البيانات PostgreSQL
 const pool = new Pool({
   connectionString: 'postgresql://postgres:mXAiWasoFVFCFMoxciHDHRZnbyRMtMRU@metro.proxy.rlwy.net:55602/railway',
   ssl: { rejectUnauthorized: false }
@@ -19,15 +19,17 @@ pool.query(`
     id SERIAL PRIMARY KEY,
     name TEXT,
     phone TEXT,
+    id_number TEXT,
+    dob DATE,
     device TEXT,
     cash_price INTEGER,
     installment_price INTEGER,
     monthly INTEGER,
-    order_code TEXT,
+    order_code TEXT UNIQUE,
     status TEXT DEFAULT 'قيد المراجعة',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
-`);
+`).catch(console.error);
 
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -72,7 +74,7 @@ app.get('/login', (req, res) => {
   `);
 });
 
-// تحقق من تسجيل الدخول
+// تحقق تسجيل الدخول
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   if (username === 'admin' && password === 'dev2008') {
@@ -91,7 +93,7 @@ app.get('/logout', (req, res) => {
   });
 });
 
-// صفحة لوحة التحكم
+// صفحة لوحة التحكم (عرض الطلبات)
 app.get('/admin', async (req, res) => {
   if (!req.session.authenticated) return res.redirect('/login');
 
@@ -119,7 +121,7 @@ app.get('/admin', async (req, res) => {
         <td>${order.installment_price}</td>
         <td>${order.monthly}</td>
         <td>${order.order_code}</td>
-        <td>${new Date(order.created_at).toLocaleString()}</td>
+        <td>${new Date(order.created_at).toLocaleString('ar-EG')}</td>
         <td>
           <select onchange="updateStatus(${order.id}, this.value)">
             <option value="قيد المراجعة" ${order.status === 'قيد المراجعة' ? 'selected' : ''}>قيد المراجعة</option>
@@ -183,7 +185,10 @@ app.get('/admin', async (req, res) => {
             function deleteOrder(id) {
               if (confirm('هل أنت متأكد أنك تريد حذف هذا الطلب؟')) {
                 fetch('/api/delete/' + id, { method: 'DELETE' })
-                  .then(res => res.ok ? location.reload() : alert('حدث خطأ أثناء الحذف'));
+                  .then(res => {
+                    if (res.ok) location.reload();
+                    else alert('حدث خطأ أثناء الحذف');
+                  });
               }
             }
 
@@ -193,15 +198,9 @@ app.get('/admin', async (req, res) => {
                   .then(res => res.json())
                   .then(data => {
                     if (data.success) {
-                      const name = encodeURIComponent(data.order.name);
-                      const code = encodeURIComponent(data.order.order_code);
                       let phone = data.order.phone;
-
-                      if (phone.startsWith('0')) {
-                        phone = '966' + phone.slice(1);
-                      } else if (phone.startsWith('5')) {
-                        phone = '966' + phone;
-                      }
+                      if (phone.startsWith('0')) phone = '966' + phone.slice(1);
+                      else if (phone.startsWith('5')) phone = '966' + phone;
 
                       const message = \`مرحبًا \${data.order.name}، تم تنفيذ الطلب ✅\\nرقم الطلب: \${data.order.order_code}\\n.عميلنا العزيز، تم استلام طلبك لتمويل تقسيط الجوال عبر 4Store. لمتابعة الطلب أو استكمال الإجراءات، يرجى زيارة الرابط المرسل برسالة نصية\`;
                       const url = \`https://wa.me/\${phone}?text=\${encodeURIComponent(message)}\`;
@@ -231,25 +230,25 @@ app.get('/admin', async (req, res) => {
   }
 });
 
-// إضافة طلب
+// إضافة طلب جديد
 app.post('/api/order', async (req, res) => {
-  const { name, phone, device, cashPrice, installmentPrice, monthly, code } = req.body;
+  const { name, phone, idNumber, dob, device, cashPrice, installmentPrice, monthly, code } = req.body;
 
   if (!name || !phone || !device || !code || phone.length < 8 || name.length < 2) {
     return res.status(400).json({ error: 'البيانات المدخلة غير صحيحة' });
   }
 
   try {
-    const existing = await pool.query('SELECT * FROM orders WHERE phone = $1 AND order_code = $2', [phone, code]);
-
+    // تحقق من وجود كود الطلب مسبقًا (كود فريد)
+    const existing = await pool.query('SELECT * FROM orders WHERE order_code = $1', [code]);
     if (existing.rows.length > 0) {
       return res.status(400).json({ error: 'تم تقديم هذا الطلب مسبقًا' });
     }
 
     await pool.query(`
-      INSERT INTO orders (name, phone, device, cash_price, installment_price, monthly, order_code)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [name, phone, device, cashPrice, installmentPrice, monthly, code]);
+      INSERT INTO orders (name, phone, id_number, dob, device, cash_price, installment_price, monthly, order_code)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `, [name, phone, idNumber, dob, device, cashPrice, installmentPrice, monthly, code]);
 
     res.status(200).json({ success: true });
   } catch (err) {
@@ -270,7 +269,7 @@ app.delete('/api/delete/:id', async (req, res) => {
   }
 });
 
-// تحديث الحالة
+// تحديث حالة طلب
 app.put('/api/status/:id', async (req, res) => {
   const id = req.params.id;
   const { status } = req.body;
@@ -283,7 +282,7 @@ app.put('/api/status/:id', async (req, res) => {
   }
 });
 
-// API لجلب بيانات الطلب
+// جلب بيانات طلب معين
 app.get('/api/get-order/:id', async (req, res) => {
   const id = req.params.id;
   try {
