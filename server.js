@@ -7,13 +7,13 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// اتصال قاعدة البيانات PostgreSQL
+// اتصال بقاعدة البيانات مع إضافة الحقول الجديدة id_number و dob
 const pool = new Pool({
   connectionString: 'postgresql://postgres:mXAiWasoFVFCFMoxciHDHRZnbyRMtMRU@metro.proxy.rlwy.net:55602/railway',
   ssl: { rejectUnauthorized: false }
 });
 
-// إنشاء جدول الطلبات إن لم يكن موجودًا
+// إنشاء جدول الطلبات مع الحقول الجديدة (يتم تشغيلها عند بدء السيرفر)
 pool.query(`
   CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
@@ -25,11 +25,11 @@ pool.query(`
     cash_price INTEGER,
     installment_price INTEGER,
     monthly INTEGER,
-    order_code TEXT UNIQUE,
+    order_code TEXT,
     status TEXT DEFAULT 'قيد المراجعة',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
-`).catch(console.error);
+`).catch(err => console.error('Error creating table:', err));
 
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -74,7 +74,7 @@ app.get('/login', (req, res) => {
   `);
 });
 
-// تحقق تسجيل الدخول
+// تحقق من تسجيل الدخول
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   if (username === 'admin' && password === 'dev2008') {
@@ -93,7 +93,7 @@ app.get('/logout', (req, res) => {
   });
 });
 
-// صفحة لوحة التحكم (عرض الطلبات)
+// صفحة لوحة التحكم مع عرض رقم الهوية وتاريخ الميلاد
 app.get('/admin', async (req, res) => {
   if (!req.session.authenticated) return res.redirect('/login');
 
@@ -116,12 +116,14 @@ app.get('/admin', async (req, res) => {
       <tr>
         <td>${order.name}</td>
         <td>${order.phone}</td>
+        <td>${order.id_number || ''}</td>
+        <td>${order.dob ? new Date(order.dob).toLocaleDateString('ar-EG') : ''}</td>
         <td>${order.device}</td>
         <td>${order.cash_price}</td>
         <td>${order.installment_price}</td>
         <td>${order.monthly}</td>
         <td>${order.order_code}</td>
-        <td>${new Date(order.created_at).toLocaleString('ar-EG')}</td>
+        <td>${new Date(order.created_at).toLocaleString()}</td>
         <td>
           <select onchange="updateStatus(${order.id}, this.value)">
             <option value="قيد المراجعة" ${order.status === 'قيد المراجعة' ? 'selected' : ''}>قيد المراجعة</option>
@@ -168,6 +170,8 @@ app.get('/admin', async (req, res) => {
               <tr>
                 <th>الاسم</th>
                 <th>الجوال</th>
+                <th>رقم الهوية</th>
+                <th>تاريخ الميلاد</th>
                 <th>الجهاز</th>
                 <th>السعر كاش</th>
                 <th>السعر تقسيط</th>
@@ -185,10 +189,7 @@ app.get('/admin', async (req, res) => {
             function deleteOrder(id) {
               if (confirm('هل أنت متأكد أنك تريد حذف هذا الطلب؟')) {
                 fetch('/api/delete/' + id, { method: 'DELETE' })
-                  .then(res => {
-                    if (res.ok) location.reload();
-                    else alert('حدث خطأ أثناء الحذف');
-                  });
+                  .then(res => res.ok ? location.reload() : alert('حدث خطأ أثناء الحذف'));
               }
             }
 
@@ -198,9 +199,15 @@ app.get('/admin', async (req, res) => {
                   .then(res => res.json())
                   .then(data => {
                     if (data.success) {
+                      const name = encodeURIComponent(data.order.name);
+                      const code = encodeURIComponent(data.order.order_code);
                       let phone = data.order.phone;
-                      if (phone.startsWith('0')) phone = '966' + phone.slice(1);
-                      else if (phone.startsWith('5')) phone = '966' + phone;
+
+                      if (phone.startsWith('0')) {
+                        phone = '966' + phone.slice(1);
+                      } else if (phone.startsWith('5')) {
+                        phone = '966' + phone;
+                      }
 
                       const message = \`مرحبًا \${data.order.name}، تم تنفيذ الطلب ✅\\nرقم الطلب: \${data.order.order_code}\\n.عميلنا العزيز، تم استلام طلبك لتمويل تقسيط الجوال عبر 4Store. لمتابعة الطلب أو استكمال الإجراءات، يرجى زيارة الرابط المرسل برسالة نصية\`;
                       const url = \`https://wa.me/\${phone}?text=\${encodeURIComponent(message)}\`;
@@ -230,17 +237,17 @@ app.get('/admin', async (req, res) => {
   }
 });
 
-// إضافة طلب جديد
+// إضافة طلب مع الحقول الجديدة
 app.post('/api/order', async (req, res) => {
   const { name, phone, idNumber, dob, device, cashPrice, installmentPrice, monthly, code } = req.body;
 
-  if (!name || !phone || !device || !code || phone.length < 8 || name.length < 2) {
+  if (!name || !phone || !idNumber || !dob || !device || !code) {
     return res.status(400).json({ error: 'البيانات المدخلة غير صحيحة' });
   }
 
   try {
-    // تحقق من وجود كود الطلب مسبقًا (كود فريد)
-    const existing = await pool.query('SELECT * FROM orders WHERE order_code = $1', [code]);
+    const existing = await pool.query('SELECT * FROM orders WHERE phone = $1 AND order_code = $2', [phone, code]);
+
     if (existing.rows.length > 0) {
       return res.status(400).json({ error: 'تم تقديم هذا الطلب مسبقًا' });
     }
@@ -269,7 +276,7 @@ app.delete('/api/delete/:id', async (req, res) => {
   }
 });
 
-// تحديث حالة طلب
+// تحديث الحالة
 app.put('/api/status/:id', async (req, res) => {
   const id = req.params.id;
   const { status } = req.body;
@@ -282,7 +289,7 @@ app.put('/api/status/:id', async (req, res) => {
   }
 });
 
-// جلب بيانات طلب معين
+// API لجلب بيانات الطلب (للواتساب)
 app.get('/api/get-order/:id', async (req, res) => {
   const id = req.params.id;
   try {
@@ -296,7 +303,7 @@ app.get('/api/get-order/:id', async (req, res) => {
   }
 });
 
-// بدء السيرفر
+// تشغيل السيرفر
 app.listen(port, () => {
   console.log(`🚀 Server running at http://localhost:${port}`);
 });
