@@ -19,8 +19,6 @@ pool.query(`
     id SERIAL PRIMARY KEY,
     name TEXT,
     phone TEXT,
-    id_number TEXT,
-    dob DATE,
     device TEXT,
     cash_price INTEGER,
     installment_price INTEGER,
@@ -28,7 +26,10 @@ pool.query(`
     order_code TEXT,
     status TEXT DEFAULT 'قيد المراجعة',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )
+  );
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS id_number TEXT;
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS dob DATE;
+`).catch(err => console.error('Error creating or altering table:', err));
 `).catch(err => console.error('Error creating table:', err));
 
 app.use(cors());
